@@ -20,7 +20,6 @@ public class CreateCourierTests extends BaseTests {
                     .as(LoginCourierResponse.class);
             NetworkService.deleteCourier(response.getId());
         }
-        courierForDelete = null;
     }
 
     @Test
