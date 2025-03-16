@@ -1,152 +1,154 @@
+import io.qameta.allure.Description;
 import io.qameta.allure.Step;
-import io.restassured.RestAssured;
 import io.restassured.response.Response;
 import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
 
 
-import java.util.ArrayList;
-import java.util.List;
-
 import static org.hamcrest.Matchers.*;
 
-public class CreateCourierTests {
+public class CreateCourierTests extends BaseTests {
 
-    List<Courier> couriers = new ArrayList<Courier>();
+    Courier courierForDelete;;
 
-    @Before
-    public void setUp() {
-        RestAssured.baseURI = "https://qa-scooter.praktikum-services.ru/";
-    }
     @After
     public void deleteCourier() {
-
-        for(int i = 0; i < couriers.size(); i++) {
-            Courier courier = couriers.get(i);
-
+        if(courierForDelete != null) {
             LoginCourierResponse response = NetworkService
-                    .login(courier.getLogin(), courier.getPassword())
+                    .login(courierForDelete.getLogin(), courierForDelete.getPassword())
                     .body()
                     .as(LoginCourierResponse.class);
             NetworkService.deleteCourier(response.getId());
         }
-        couriers.clear();
+        courierForDelete = null;
     }
 
     @Test
+    @Description("check new courier successful creation: status code and response body")
     public void createNewCourierTest() {
+        Courier courier = generateNewCourier();
+
+        Response response = sendCreateCourierRequest(courier);
+        checkCreateCourierSuccessfulResponse(response);
+
+        courierForDelete = courier;
+    }
+
+    @Step("generate new courier")
+    public Courier generateNewCourier() {
         CourierDataSet dataSet = new CourierDataSet();
-
-        Courier courier = dataSet.randomCourier;
-
-        couriers.add(courier);
-
-        Response response = NetworkService.createCourier(courier);
-        response.then().assertThat().body("ok", is(true))
+        return dataSet.courier;
+    }
+    @Step("send POST request to /api/v1/courier")
+    public Response sendCreateCourierRequest(Courier courier) {
+        return NetworkService.createCourier(courier);
+    }
+    @Step("check create courier response")
+    public void checkCreateCourierSuccessfulResponse(Response response) {
+        response.then().assertThat()
+                .body("ok", is(true))
                 .and()
                 .statusCode(201);
     }
 
 
     @Test
+    @Description("check impossible two identical couriers creation: status code and response body")
     public void cannotCreateTwoIdenticalCouriersTest() {
-        CourierDataSet dataSet = new CourierDataSet();
-        Courier courier = dataSet.randomCourier;
+        Courier courier = generateNewCourier();
 
-        couriers.add(courier);
+        Response firstResponse = sendCreateCourierRequest(courier);
 
+        checkCreateCourierSuccessfulResponse(firstResponse);
 
-        Response firstResponse = NetworkService.createCourier(courier);
-        firstResponse.then().assertThat().body("ok", is(true))
-                .and()
-                .statusCode(201);
+        courierForDelete = courier;
 
-        Response secondResponse = NetworkService.createCourier(courier);
-        secondResponse.then().assertThat().body("message", is("Этот логин уже используется"))
+        Response secondResponse = sendCreateCourierRequest(courier);
+        checkCreateCourierDuplicateErrorResponse(secondResponse);
+    }
+    @Step("check duplicate courier response error")
+    public void checkCreateCourierDuplicateErrorResponse(Response response) {
+        response.then().assertThat().body("message", is("Этот логин уже используется"))
                 .and()
                 .statusCode(409);
     }
 
-    @Test
-    public void correctResponseCodeTest() {
-        CourierDataSet dataSet = new CourierDataSet();
-        Courier courier = dataSet.randomCourier;
 
-        couriers.add(courier);
-
-        Response response = NetworkService.createCourier(courier);
-        response.then().statusCode(201);
-    }
 
     @Test
-    public void successfulRequestResponseBodyTest() {
-        CourierDataSet dataSet = new CourierDataSet();
-        Courier courier = dataSet.randomCourier;
-
-        couriers.add(courier);
-
-        Response response = NetworkService.createCourier(courier);
-        response.then().assertThat().body("ok", is(true));
-    }
-
-    @Test
+    @Description("check creation courier without login")
     public void createCourierWithoutLoginTest() {
+        Courier courier = generateCourierWithoutLogin();
+
+        Response response = sendCreateCourierRequest(courier);
+        checkAbsentRequiredFieldResponseError(response);
+    }
+    @Step("generate courier without login")
+    public Courier generateCourierWithoutLogin() {
         CourierDataSet dataSet = new CourierDataSet();
-        Courier courier = new Courier(null, dataSet.randomPassword, dataSet.randomFirstName);
 
-
-        Response response = NetworkService.createCourier(courier);
+        return new Courier(null, dataSet.password, dataSet.firstName);
+    }
+    @Step("check absent required field response error")
+    public void checkAbsentRequiredFieldResponseError(Response response) {
         response.then().assertThat().body("message", is("Недостаточно данных для создания учетной записи"));
     }
 
+
+
     @Test
+    @Description("check creation courier without password")
     public void createCourierWithoutPasswordTest() {
+        Courier courier = generateCourierWithoutPassword();
+
+        Response response = sendCreateCourierRequest(courier);
+        checkAbsentRequiredFieldResponseError(response);
+    }
+    @Step("generate courier without password")
+    public Courier generateCourierWithoutPassword() {
         CourierDataSet dataSet = new CourierDataSet();
-        Courier courier = new Courier(dataSet.randomLogin, null, dataSet.randomFirstName);
 
-
-        Response response = NetworkService.createCourier(courier);
-        response.then().assertThat().body("message", is("Недостаточно данных для создания учетной записи"));
+        return new Courier(dataSet.login, null, dataSet.firstName);
     }
 
+
     @Test
+    @Description("check creation courier without firstname")
     public void createCourierWithoutFirstNameTest() {
+        Courier courier = generateCourierWithoutFirstName();
+
+        courierForDelete = courier;
+
+        Response response = sendCreateCourierRequest(courier);
+        checkCreateCourierSuccessfulResponse(response);
+    }
+    @Step("generate courier without firstname")
+    public Courier generateCourierWithoutFirstName() {
         CourierDataSet dataSet = new CourierDataSet();
-        Courier courier = new Courier(dataSet.randomLogin, dataSet.randomPassword, null);
 
-        couriers.add(courier);
-
-
-        Response response = NetworkService.createCourier(courier);
-        response.then().assertThat().body("ok", is(true))
-                .and()
-                .statusCode(201);
+        return new Courier(dataSet.login, dataSet.password, null);
     }
 
     @Test
+    @Description("check login with taken login")
     public void loginAlreadyTakenTest() {
-        CourierDataSet dataSet1 = new CourierDataSet();
-        Courier firstCourier = dataSet1.randomCourier;
-        couriers.add(firstCourier);
 
+        Courier firstCourier = generateNewCourier();
+        courierForDelete = firstCourier;
 
-        Response firstResponse = NetworkService.createCourier(firstCourier);
-        firstResponse.then().assertThat().body("ok", is(true))
-                .and()
-                .statusCode(201);
+        Response firstResponse = sendCreateCourierRequest(firstCourier);
+        checkCreateCourierSuccessfulResponse(firstResponse);
 
+        Courier secondCourier = generateCourierWithFixedLogin(firstCourier.getLogin());
+
+        Response secondResponse = sendCreateCourierRequest(secondCourier);
+        checkCreateCourierDuplicateErrorResponse(secondResponse);
+    }
+    @Step("generate courier with fixed login")
+    public Courier generateCourierWithFixedLogin(String login) {
         CourierDataSet dataSet2 = new CourierDataSet();
 
-        Courier secondCourier = new Courier(firstCourier.getLogin(), dataSet2.randomPassword, dataSet2.randomFirstName);
-
-        couriers.add(secondCourier);
-
-
-        Response secondResponse = NetworkService.createCourier(secondCourier);
-        secondResponse.then().assertThat().body("message", is("Этот логин уже используется"))
-                .and()
-                .statusCode(409);
+        return new Courier(login, dataSet2.password, dataSet2.firstName);
     }
 
 

@@ -1,26 +1,28 @@
+import io.qameta.allure.Description;
 import io.qameta.allure.Step;
-import io.restassured.RestAssured;
 import io.restassured.response.Response;
-import org.junit.Before;
-import org.junit.Test;
 
-import static io.restassured.RestAssured.given;
+import org.junit.Test;
 import static org.hamcrest.CoreMatchers.notNullValue;
 
-public class GetOrdersListTests {
-    @Before
-    public void setUp() {
-        RestAssured.baseURI = "https://qa-scooter.praktikum-services.ru/";
-    }
+public class GetOrdersListTests extends BaseTests {
 
     @Test
-    public void responseBodyContainsOrders () {
+    @Description("check response body contains orders")
+    public void responseBodyContainsOrders() {
+        Response response = sendGetOrdersRequest();
+        checkGetOrdersSuccessfulResponse(response);
 
-        Response response = given().get("/api/v1/orders");
+    }
+    @Step("send GET request to /api/v1/orders")
+    public Response sendGetOrdersRequest() {
+        return NetworkService.getOrders();
+    }
 
+    @Step("check response")
+    public void checkGetOrdersSuccessfulResponse(Response response) {
         response.then().assertThat().body("orders", notNullValue())
                 .and()
                 .statusCode(200);
-
     }
 }
